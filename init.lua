@@ -96,9 +96,22 @@ require('lazy').setup({
   },
   {'VonHeikemen/lsp-zero.nvim', branch = 'v3.x',
     config = function()
-
+      
       local lsp_zero = require('lsp-zero')
-
+      lsp_zero.extend_lspconfig()
+      -- don't add this function in the `on_attach` callback.
+      -- `format_on_save` should run only once, before the language servers are active.
+      lsp_zero.format_on_save({
+        format_opts = {
+          async = false,
+          timeout_ms = 10000,
+        },
+        servers = {
+          ['tsserver'] = {'javascript', 'typescript'},
+          ['rust_analyzer'] = {'rust'},
+          ['prettier'] = {'python'},
+        }
+      })
       lsp_zero.on_attach(function(client, bufnr)
         local opts = {buffer = bufnr, remap = false}
 
@@ -118,7 +131,7 @@ require('lazy').setup({
       -- read this: https://github.com/VonHeikemen/lsp-zero.nvim/blob/v3.x/doc/md/guides/integrate-with-mason-nvim.md
       require('mason').setup({})
       require('mason-lspconfig').setup({
-        ensure_installed = {'tsserver', 'rust_analyzer','pyright'},
+        ensure_installed = {'tsserver', 'rust_analyzer','pyright','prettier'},
         handlers = {
           lsp_zero.default_setup,
           lua_ls = function()
