@@ -23,7 +23,9 @@ vim.opt.updatetime = 50
 vim.opt.colorcolumn = "80"
 
 vim.keymap.set("v","<M-Up>",":m '<-2<CR>gv=gv")
+vim.keymap.set("v","<M-k>",":m '<-2<CR>gv=gv")
 vim.keymap.set("v","<M-Down>",":m '>+1<CR>gv=gv")
+vim.keymap.set("v","<M-j>",":m '>+1<CR>gv=gv")
 
 vim.keymap.set("x","<leader>p", "\"_dP")
 vim.keymap.set("i","<C-j>", "<Esc>o")
