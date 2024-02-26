@@ -109,7 +109,7 @@ require('lazy').setup({
         servers = {
           ['tsserver'] = {'javascript', 'typescript'},
           ['rust_analyzer'] = {'rust'},
-          ['prettier'] = {'python'},
+          ['prettierd'] = {'python', 'typescript'},
         }
       })
       lsp_zero.on_attach(function(client, bufnr)
@@ -273,6 +273,14 @@ require('lazy').setup({
   },
 
   {
+    'projekt0n/github-nvim-theme',
+    lazy = false, -- make sure we load this during startup if it is your main colorscheme
+    priority = 1003, -- make sure to load this before all the other start plugins
+    config = function()
+      vim.cmd('colorscheme github_light_default')
+    end,
+  },
+  {
     -- Theme inspired by Atom
     'navarasu/onedark.nvim',
     priority = 1000,
@@ -280,7 +288,7 @@ require('lazy').setup({
     config = function()
       require('onedark').setup {
         -- Set a style preset. 'dark' is default.
-        style = 'dark', -- dark, darker, cool, deep, warm, warmer, light
+        style = 'light', -- dark, darker, cool, deep, warm, warmer, light
       }
       require('onedark').load()
     end,
