@@ -31,6 +31,7 @@ vim.keymap.set("x","<leader>p", "\"_dP")
 vim.keymap.set("i","<C-j>", "<Esc>o")
 vim.keymap.set("i","<C-Enter>", "<Esc>o")
 
-vim.keymap.set('n', '<leader>pv', vim.cmd.Ex, {desc = 'Open Explorer'})
+-- vim.keymap.set('n', '<leader>pv', vim.cmd.Ex, {desc = 'Open Explorer'})
+vim.keymap.set('n', '<leader>p', vim.cmd.Ex, {desc = 'Open Explorer'})
 
 return {}
