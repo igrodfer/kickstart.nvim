@@ -34,4 +34,19 @@ vim.keymap.set("i","<C-Enter>", "<Esc>o")
 -- vim.keymap.set('n', '<leader>pv', vim.cmd.Ex, {desc = 'Open Explorer'})
 vim.keymap.set('n', '<leader>p', vim.cmd.Ex, {desc = 'Open Explorer'})
 
+
+vim.api.nvim_create_autocmd({'Filetype'}, {
+  pattern = {"python"},
+  callback = function()
+    vim.keymap.set('x','<leader>r','yoprint("f{pA=}"')
+  end
+})
+
+vim.api.nvim_create_autocmd({'Filetype'}, {
+  pattern = {"javascript","typescript"},
+  callback = function()
+    vim.keymap.set('x','<leader>r','yoconsole.log("pA",pA);')
+  end
+})
+
 return {}
