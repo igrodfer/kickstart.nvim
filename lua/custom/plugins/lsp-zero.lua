@@ -1,206 +1,188 @@
+-- LSP stack migrated from the original configuration. All original packages
+-- remain explicit; only their loading order and Neovim 0.12 API are updated.
+local servers = { 'lua_ls', 'pyright', 'rust_analyzer', 'ts_ls' }
 
-local nmap = function(keys, func, desc)
-  if desc then
-    desc = 'LSP: ' .. desc
+local function setup_lsp()
+  -- lsp-zero v3 still provides the keymaps and completion format. Its server
+  -- wrapper calls lspconfig's retired API, so Neovim 0.12 registers servers.
+  vim.g.lsp_zero_extend_lspconfig = 0
+  local lsp_zero = require('lsp-zero')
+
+  lsp_zero.on_attach(function(_, bufnr)
+    lsp_zero.default_keymaps({ buffer = bufnr })
+    local function map(keys, action, desc)
+      vim.keymap.set('n', keys, action, { buffer = bufnr, desc = 'LSP: ' .. desc })
+    end
+    map('<leader>rn', vim.lsp.buf.rename, 'Rename')
+    map('<leader>ca', vim.lsp.buf.code_action, 'Code action')
+    map('gd', require('telescope.builtin').lsp_definitions, 'Definition')
+    map('gr', require('telescope.builtin').lsp_references, 'References')
+    map('gI', require('telescope.builtin').lsp_implementations, 'Implementation')
+    map('<leader>D', require('telescope.builtin').lsp_type_definitions, 'Type definition')
+    map('<leader>ds', require('telescope.builtin').lsp_document_symbols, 'Document symbols')
+    map('<leader>ws', require('telescope.builtin').lsp_dynamic_workspace_symbols, 'Workspace symbols')
+    map('K', vim.lsp.buf.hover, 'Hover')
+    map('<C-k>', vim.lsp.buf.signature_help, 'Signature help')
+    map('gD', vim.lsp.buf.declaration, 'Declaration')
+    map('<leader>wa', vim.lsp.buf.add_workspace_folder, 'Add workspace folder')
+    map('<leader>wr', vim.lsp.buf.remove_workspace_folder, 'Remove workspace folder')
+    map('<leader>wl', function()
+      print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
+    end, 'List workspace folders')
+    vim.keymap.set('i', '<C-h>', vim.lsp.buf.signature_help, { buffer = bufnr, desc = 'LSP: Signature help' })
+    vim.api.nvim_buf_create_user_command(bufnr, 'Format', function()
+      vim.lsp.buf.format()
+    end, { desc = 'Format current buffer with LSP' })
+  end)
+
+  vim.lsp.config('lua_ls', {
+    settings = { Lua = { diagnostics = { globals = { 'vim' } } } },
+  })
+  for _, server in ipairs({ 'pyright', 'rust_analyzer', 'ts_ls' }) do
+    vim.lsp.config(server, {})
   end
+  vim.lsp.enable(servers)
 
-  vim.keymap.set('n', keys, func, { buffer = bufnr, desc = desc })
+  local cmp = require('cmp')
+  local luasnip = require('luasnip')
+  require('luasnip.loaders.from_vscode').lazy_load()
+  luasnip.config.setup({})
+  cmp.setup({
+    formatting = lsp_zero.cmp_format(),
+    sources = {
+      { name = 'path' },
+      { name = 'nvim_lsp' },
+      { name = 'nvim_lua' },
+      { name = 'luasnip', keyword_length = 2 },
+      { name = 'buffer', keyword_length = 3 },
+    },
+    mapping = cmp.mapping.preset.insert({
+      ['<C-p>'] = cmp.mapping.select_prev_item(),
+      ['<C-n>'] = cmp.mapping.select_next_item(),
+      ['<C-y>'] = cmp.mapping.confirm({ select = true }),
+      ['<C-Space>'] = cmp.mapping.complete(),
+      ['<CR>'] = cmp.mapping.confirm({ behavior = cmp.ConfirmBehavior.Replace, select = true }),
+      ['<Tab>'] = cmp.mapping(function(fallback)
+        if cmp.visible() then
+          cmp.select_next_item()
+        elseif luasnip.expand_or_locally_jumpable() then
+          luasnip.expand_or_jump()
+        else
+          fallback()
+        end
+      end, { 'i', 's' }),
+      ['<S-Tab>'] = cmp.mapping(function(fallback)
+        if cmp.visible() then
+          cmp.select_prev_item()
+        elseif luasnip.locally_jumpable(-1) then
+          luasnip.jump(-1)
+        else
+          fallback()
+        end
+      end, { 'i', 's' }),
+    }),
+  })
 end
+
 return {
+  { 'williamboman/mason.nvim', opts = {} },
   {
-    "williamboman/mason.nvim",
-    "mfussenegger/nvim-dap",
-    "rcarriga/nvim-dap-ui",
-    "jay-babu/mason-nvim-dap.nvim",
+    'neovim/nvim-lspconfig',
+    dependencies = {
+      { 'VonHeikemen/lsp-zero.nvim', branch = 'v3.x' },
+      'williamboman/mason.nvim',
+      'williamboman/mason-lspconfig.nvim',
+      { 'j-hui/fidget.nvim', opts = {} },
+      'folke/neodev.nvim',
+      'hrsh7th/nvim-cmp',
+      'L3MON4D3/LuaSnip',
+      'saadparwaiz1/cmp_luasnip',
+      'hrsh7th/cmp-nvim-lsp',
+      'hrsh7th/cmp-path',
+      'hrsh7th/cmp-buffer',
+      'rafamadriz/friendly-snippets',
+    },
+    config = setup_lsp,
   },
   {
-    "jay-babu/mason-null-ls.nvim",
-    event = { "BufReadPre", "BufNewFile" },
-    dependencies = {
-      "williamboman/mason.nvim",
-      "nvimtools/none-ls.nvim",
-    },
+    'williamboman/mason-lspconfig.nvim',
+    dependencies = { 'williamboman/mason.nvim', 'neovim/nvim-lspconfig' },
+    opts = { ensure_installed = servers, automatic_enable = false },
+  },
+  {
+    'nvimtools/none-ls.nvim',
     config = function()
-      require("mason-null-ls").setup{
-	ensure_installed = {"stylua","prettierd"},
-	automatic_installation = true,
-
-      } -- require your null-ls config here (example below)
+      require('null-ls').setup({})
     end,
   },
   {
-    'VonHeikemen/lsp-zero.nvim', branch = 'v3.x',
+    'jay-babu/mason-null-ls.nvim',
+    dependencies = { 'williamboman/mason.nvim', 'nvimtools/none-ls.nvim' },
+    opts = {
+      ensure_installed = { 'stylua', 'prettierd' },
+      automatic_installation = true,
+    },
+  },
+  { 'mfussenegger/nvim-dap' },
+  {
+    'rcarriga/nvim-dap-ui',
+    dependencies = { 'mfussenegger/nvim-dap', 'nvim-neotest/nvim-nio' },
+    opts = {},
+  },
+  {
+    'jay-babu/mason-nvim-dap.nvim',
+    dependencies = { 'williamboman/mason.nvim', 'mfussenegger/nvim-dap' },
+    opts = { ensure_installed = { 'python' }, automatic_installation = true },
+  },
+  {
+    'nvim-java/nvim-java',
+    ft = { 'java' },
+    dependencies = {
+      'JavaHello/spring-boot.nvim',
+      'MunifTanjim/nui.nvim',
+      'neovim/nvim-lspconfig',
+      'mfussenegger/nvim-dap',
+      'williamboman/mason.nvim',
+      'nvim-neotest/nvim-nio',
+    },
     config = function()
+      require('java').setup({ spring_boot_tools = { enable = true } })
+      local spring_util = require('spring_boot.util')
+      spring_util.execute_command = function(client, command, param, callback)
+        local co
+        if not callback then
+          co = coroutine.running()
+          if co then
+            callback = function(err, response)
+              coroutine.resume(co, err, response)
+            end
+          end
+        end
+        client:request('workspace/executeCommand', {
+          command = command,
+          arguments = param,
+        }, callback)
+        if co then
+          return coroutine.yield()
+        end
+      end
 
-      local lsp_zero = require('lsp-zero')
-      lsp_zero.extend_lspconfig()
-      -- don't add this function in the `on_attach` callback.
-      -- `format_on_save` should run only once, before the language servers are active.
- --      lsp_zero.format_on_save({
-	-- format_opts = {
-	--   async = false,
-	--   timeout_ms = 10000,
-	-- },
-	-- servers = {
-	--   ['tsserver'] = {'javascript', 'typescript'},
-	--   ['rust_analyzer'] = {'rust'},
-	--   ['prettierd'] = {'python', 'typescript'},
-	--   ['sonarlint-language-server'] = {'typescript'},
-	-- }
- --      })
-
-      lsp_zero.on_attach(function(client, bufnr)
-	local opts = {buffer = bufnr, remap = false}
-
-	nmap('<leader>rn', vim.lsp.buf.rename, '[R]e[n]ame')
-	nmap('<leader>ca', function()
-	  vim.lsp.buf.code_action { context = { only = { 'quickfix', 'refactor', 'source' } } }
-	end, '[C]ode [A]ction')
-
-	nmap('gd', require('telescope.builtin').lsp_definitions, '[G]oto [D]efinition')
-	nmap('gr', require('telescope.builtin').lsp_references, '[G]oto [R]eferences')
-	nmap('gI', require('telescope.builtin').lsp_implementations, '[G]oto [I]mplementation')
-	nmap('<leader>D', require('telescope.builtin').lsp_type_definitions, 'Type [D]efinition')
-	nmap('<leader>ds', require('telescope.builtin').lsp_document_symbols, '[D]ocument [S]ymbols')
-	nmap('<leader>ws', require('telescope.builtin').lsp_dynamic_workspace_symbols, '[W]orkspace [S]ymbols')
-
-	-- See `:help K` for why this keymap
-	nmap('K', vim.lsp.buf.hover, 'Hover Documentation')
-	nmap('<C-k>', vim.lsp.buf.signature_help, 'Signature Documentation')
-
-	-- Lesser used LSP functionality
-	nmap('gD', vim.lsp.buf.declaration, '[G]oto [D]eclaration')
-	nmap('<leader>wa', vim.lsp.buf.add_workspace_folder, '[W]orkspace [A]dd Folder')
-	nmap('<leader>wr', vim.lsp.buf.remove_workspace_folder, '[W]orkspace [R]emove Folder')
-	nmap('<leader>wl', function()
-	  print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
-	end, '[W]orkspace [L]ist Folders')
-	vim.keymap.set("i", "<C-h>", vim.lsp.buf.signature_help, {desc = 'Hover Documentation'})
-
-	-- Create a command `:Format` local to the LSP buffer
-	vim.api.nvim_buf_create_user_command(bufnr, 'Format', function(_)
-	  vim.lsp.buf.format()
-	end, { desc = 'Format current buffer with LSP' })
-
-	-- Diagnostic keymaps
-	vim.keymap.set('n', '[d', vim.diagnostic.goto_prev, { desc = 'Go to previous diagnostic message' })
-	vim.keymap.set('n', ']d', vim.diagnostic.goto_next, { desc = 'Go to next diagnostic message' })
-	vim.keymap.set('n', '<leader>e', vim.diagnostic.open_float, { desc = 'Open floating diagnostic message' })
-	vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostics list' })
-
-      end)
-
-      -- document existing key chains
-      require('which-key').register {
-	['<leader>c'] = { name = '[C]ode', _ = 'which_key_ignore' },
-	['<leader>d'] = { name = '[D]ocument', _ = 'which_key_ignore' },
-	['<leader>g'] = { name = '[G]it', _ = 'which_key_ignore' },
-	['<leader>h'] = { name = 'Git [H]unk', _ = 'which_key_ignore' },
-	['<leader>r'] = { name = '[R]ename', _ = 'which_key_ignore' },
-	['<leader>s'] = { name = '[S]earch', _ = 'which_key_ignore' },
-	['<leader>t'] = { name = '[T]oggle', _ = 'which_key_ignore' },
-	['<leader>w'] = { name = '[W]orkspace', _ = 'which_key_ignore' },
-      }
-      -- register which-key VISUAL mode
-      -- required for visual <leader>hs (hunk stage) to work
-      require('which-key').register({
-	['<leader>'] = { name = 'VISUAL <leader>' },
-	['<leader>h'] = { 'Git [H]unk' },
-      }, { mode = 'v' })
-
-      -- Setup neovim lua configuration
-      require('neodev').setup()
-
-      -- to learn how to use mason.nvim with lsp-zero
-      -- read this: https://github.com/VonHeikemen/lsp-zero.nvim/blob/v3.x/doc/md/guides/integrate-with-mason-nvim.md
-      require('mason').setup({})
-      require('mason-lspconfig').setup({
-	ensure_installed = {'tsserver', 'rust_analyzer','pyright'},
-	handlers = {
-	  lsp_zero.default_setup,
-	  lua_ls = function()
-	    local lua_opts = lsp_zero.nvim_lua_ls()
-	    require('lspconfig').lua_ls.setup(lua_opts)
-	  end,
-	}
-      });
-
-      require('mason-nvim-dap').setup({
-	ensure_installed = {'python'},
-	automatic_installation = true
-      })
-
-      require('dapui').setup()
-
-      -- document existing key chains
-      require('which-key').register {
-	['<leader>c'] = { name = '[C]ode', _ = 'which_key_ignore' },
-	['<leader>d'] = { name = '[D]ocument', _ = 'which_key_ignore' },
-	['<leader>g'] = { name = '[G]it', _ = 'which_key_ignore' },
-	['<leader>h'] = { name = 'Git [H]unk', _ = 'which_key_ignore' },
-	['<leader>r'] = { name = '[R]ename', _ = 'which_key_ignore' },
-	['<leader>s'] = { name = '[S]earch', _ = 'which_key_ignore' },
-	['<leader>t'] = { name = '[T]oggle', _ = 'which_key_ignore' },
-	['<leader>w'] = { name = '[W]orkspace', _ = 'which_key_ignore' },
-      }
-      -- register which-key VISUAL mode
-      -- required for visual <leader>hs (hunk stage) to work
-      require('which-key').register({
-	['<leader>'] = { name = 'VISUAL <leader>' },
-	['<leader>h'] = { 'Git [H]unk' },
-      }, { mode = 'v' })
-      local cmp = require('cmp')
-      local cmp_select = {behavior = cmp.SelectBehavior.Select}
-
-      -- [[ Configure nvim-cmp ]]
-      -- See `:help cmp`
-      local cmp = require 'cmp'
-      local luasnip = require 'luasnip'
-      require('luasnip.loaders.from_vscode').lazy_load()
-      luasnip.config.setup {}
-
-      -- this is the function that loads the extra snippets to luasnip
-      -- from rafamadriz/friendly-snippets
-      require('luasnip.loaders.from_vscode').lazy_load()
-
-      cmp.setup({
-	sources = {
-	  {name = 'path'},
-	  {name = 'nvim_lsp'},
-	  {name = 'nvim_lua'},
-	  {name = 'luasnip', keyword_length = 2},
-	  {name = 'buffer', keyword_length = 3},
-	},
-	formatting = lsp_zero.cmp_format(),
-	mapping = cmp.mapping.preset.insert({
-	  ['<C-p>'] = cmp.mapping.select_prev_item(cmp_select),
-	  ['<C-n>'] = cmp.mapping.select_next_item(cmp_select),
-	  ['<C-y>'] = cmp.mapping.confirm({ select = true }),
-	  ['<C-Space>'] = cmp.mapping.complete(),
-	  ['<CR>'] = cmp.mapping.confirm {
-	    behavior = cmp.ConfirmBehavior.Replace,
-	    select = true,
-	  },
-	  ['<Tab>'] = cmp.mapping(function(fallback)
-	    if cmp.visible() then
-	      cmp.select_next_item()
-	    elseif luasnip.expand_or_locally_jumpable() then
-	      luasnip.expand_or_jump()
-	    else
-	      fallback()
-	    end
-	    end, { 'i', 's' }),
-	  ['<S-Tab>'] = cmp.mapping(function(fallback)
-	    if cmp.visible() then
-	      cmp.select_prev_item()
-	    elseif luasnip.locally_jumpable(-1) then
-	      luasnip.jump(-1)
-	    else
-	      fallback()
-	    end
-	    end, { 'i', 's' }),
-	}),
-      })
-    end
-  }
+      local settings_file = vim.fs.find('docker/settings.xml', {
+        path = vim.api.nvim_buf_get_name(0),
+        upward = true,
+      })[1]
+      if settings_file then
+        vim.lsp.config('jdtls', {
+          settings = {
+            java = {
+              configuration = {
+                maven = { userSettings = settings_file },
+              },
+            },
+          },
+        })
+      end
+      vim.lsp.enable('jdtls')
+    end,
+  },
 }

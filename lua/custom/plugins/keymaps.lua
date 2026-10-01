@@ -6,6 +6,16 @@
 
 -- vim.keymap.set("n","<leader>tr",function() vim.opt.relativenumber = not vim.opt.relativenumber end,{})
 
+local function display_current_file_cflist()
+  local workspace_path = vim.lsp.buf.list_workspace_folders()[1]
+  local file_path = vim.fn.expand('%:' .. workspace_path .. ':.')
+  local command = "Cfilter " .. file_path
+  vim.diagnostic.setqflist()
+  vim.cmd('packadd cfilter')
+  -- print(command)
+  vim.cmd(command)
+  -- print(file_path)
+end
 
 vim.opt.relativenumber = true
 
@@ -26,6 +36,9 @@ vim.keymap.set("v","<M-Up>",":m '<-2<CR>gv=gv")
 vim.keymap.set("v","<M-k>",":m '<-2<CR>gv=gv")
 vim.keymap.set("v","<M-Down>",":m '>+1<CR>gv=gv")
 vim.keymap.set("v","<M-j>",":m '>+1<CR>gv=gv")
+vim.keymap.set("n","<leader>e",vim.diagnostic.open_float)
+vim.keymap.set("n","<leader>q",display_current_file_cflist)
+vim.keymap.set("n","<leader><leader>q",vim.diagnostic.setqflist)
 
 vim.keymap.set("x","<leader>p", "\"_dP")
 vim.keymap.set("i","<C-j>", "<Esc>o")
